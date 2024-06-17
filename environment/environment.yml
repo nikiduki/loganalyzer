@@ -1,0 +1,5 @@
+name: loganalyzer
+dependencies:
+  - python=3.9.7
+  - pip:
+    - -r requirements.txt

@@ -1,0 +1,219 @@
+schema: '2.0'
+stages:
+  get_data:
+    cmd: source src/data/get_data.sh
+    deps:
+    - path: src/data/get_data.sh
+      md5: 5bd43d48ba720b068e22561e60e81dc0
+      size: 507
+    outs:
+    - path: data/raw/interactions.csv
+      md5: f0355208db9acf04c4ba534ae4cee73b
+      size: 180032258
+    - path: data/raw/items.csv
+      md5: 07769b0b1eaa8e020c947ca10cba163f
+      size: 31836561
+    - path: data/raw/sample_submission.csv
+      md5: ab739189fb3b87ed3feee861e5888997
+      size: 14094920
+    - path: data/raw/users.csv
+      md5: 7851a528948c19555075ad6e8d35ba90
+      size: 29945389
+  preprocess:
+    cmd: python src/data/preprocess.py data/raw/interactions.csv data/raw/items.csv
+      data/raw/users.csv data/interim/interactions_clean.csv data/interim/items_clean.csv
+      data/interim/users_clean.csv
+    deps:
+    - path: data/raw/interactions.csv
+      md5: f0355208db9acf04c4ba534ae4cee73b
+      size: 180032258
+    - path: data/raw/items.csv
+      md5: 07769b0b1eaa8e020c947ca10cba163f
+      size: 31836561
+    - path: data/raw/users.csv
+      md5: 7851a528948c19555075ad6e8d35ba90
+      size: 29945389
+    - path: src/data/preprocess.py
+      md5: d151ff2e8c6dc8d90513590da6c74e95
+      size: 6015
+    outs:
+    - path: data/interim/interactions_clean.csv
+      md5: 7ac7b4f280880411c8fecd2843c275e9
+      size: 169082235
+    - path: data/interim/items_clean.csv
+      md5: 044704c2de2bbbc614b132de6fb3ccbe
+      size: 33156058
+    - path: data/interim/users_clean.csv
+      md5: 0eb37bb20218697da93e42ff408b03dd
+      size: 43228473
+  add_item_stats_time_based:
+    cmd: snakemake --cores all --forceall --snakefile workflow/features.snake prepare_all_items_time_based
+    deps:
+    - path: data/interim/interactions_clean.csv
+      md5: 7ac7b4f280880411c8fecd2843c275e9
+      size: 169082235
+    - path: data/interim/items_clean.csv
+      md5: 044704c2de2bbbc614b132de6fb3ccbe
+      size: 33156058
+    - path: data/interim/users_clean.csv
+      md5: 0eb37bb20218697da93e42ff408b03dd
+      size: 43228473
+    - path: src/features/add_item_stats_time_based.py
+      md5: 2b4faf0b0420bbea07cc63c7ea929c72
+      size: 12596
+    - path: workflow/workflow_config.yaml
+      md5: 8c5cadb47ee1cc141945bcdb3296331f
+      size: 517
+    outs:
+    - path: data/processed/2021-08-22/item_features.csv
+      md5: be7f89fdf0fca25193da2f6da54e561b
+      size: 2126079
+  add_user_stats_static:
+    cmd: python src/features/add_user_stats_static.py data/interim/users_clean.csv
+      data/processed/users_processed_static.csv
+    deps:
+    - path: data/interim/users_clean.csv
+      md5: 0eb37bb20218697da93e42ff408b03dd
+      size: 43228473
+    - path: src/features/add_user_stats_static.py
+      md5: 5296504ff7c74f72ec1e23e1a02d496d
+      size: 1666
+    outs:
+    - path: data/processed/users_processed_static.csv
+      md5: 0eb37bb20218697da93e42ff408b03dd
+      size: 43228473
+  add_item_stats_static:
+    cmd: python src/features/add_item_stats_static.py data/interim/items_clean.csv
+      data/processed/items_processed_static.csv
+    deps:
+    - path: data/interim/items_clean.csv
+      md5: 044704c2de2bbbc614b132de6fb3ccbe
+      size: 33156058
+    - path: src/features/add_item_stats_static.py
+      md5: afb41077ddf53a6ab733edd4fea393a4
+      size: 2150
+    outs:
+    - path: data/processed/items_processed_static.csv
+      md5: 9981cf16a9719671c493d568a4de9617
+      size: 1539644
+  create_postgres_features:
+    cmd: python src/db/create_postgres_features.py data/processed/2021-08-22/item_features.csv
+      data/processed/items_processed_static.csv data/interim/items_clean.csv data/db/item_features.csv
+    deps:
+    - path: data/interim/items_clean.csv
+      md5: 044704c2de2bbbc614b132de6fb3ccbe
+      size: 33156058
+    - path: data/processed/2021-08-22/item_features.csv
+      md5: be7f89fdf0fca25193da2f6da54e561b
+      size: 2126079
+    - path: data/processed/items_processed_static.csv
+      md5: 9981cf16a9719671c493d568a4de9617
+      size: 1539644
+    - path: src/db/create_postgres_features.py
+      md5: 01aea7b376f5c79742673443b3a0bab6
+      size: 3312
+    outs:
+    - path: data/db/item_features.csv
+      md5: 588746112846eeb27ec14b1faa373594
+      size: 5862672
+  add_user_stats_time_based:
+    cmd: snakemake --cores all --forceall --snakefile workflow/features.snake prepare_all_users_time_based
+    deps:
+    - path: data/interim/interactions_clean.csv
+      md5: 7ac7b4f280880411c8fecd2843c275e9
+      size: 169082235
+    - path: data/interim/items_clean.csv
+      md5: 044704c2de2bbbc614b132de6fb3ccbe
+      size: 33156058
+    - path: data/interim/users_clean.csv
+      md5: 0eb37bb20218697da93e42ff408b03dd
+      size: 43228473
+    - path: src/features/add_user_stats_time_based.py
+      md5: 6fd4da3869b2e0cf4c6f3aa242bf8e39
+      size: 4259
+    - path: workflow/workflow_config.yaml
+      md5: 8c5cadb47ee1cc141945bcdb3296331f
+      size: 517
+    outs:
+    - path: data/processed/2021-08-22/user_features.csv
+      md5: b65dca1ac6c762c974ba384f9dc84b60
+      size: 162611161
+  train_two_stage_model:
+    cmd: python src/models/train_two_stage.py src/models/two_stage_config.yaml workflow/workflow_config.yaml
+      data/interim/interactions_clean.csv models/first_stage models/second_stage reports/metrics.json
+    deps:
+    - path: workflow/dummy
+      md5: f02e326f800ee26f04df7961adbf7c0a
+      size: 6
+    outs:
+    - path: models/first_stage
+      md5: 7d0e765ecda6f0f2e86c63bdb2db3a64.dir
+      size: 31241422
+      nfiles: 1
+    - path: models/second_stage
+      md5: 176f88c1ec4f53ae58f43c9a5ced6ef8.dir
+      size: 16539600
+      nfiles: 1
+    - path: reports/metrics.json
+      md5: 5f78bc711f8dc19754297bff52a91311
+      size: 359
+  update_postgres_features:
+    cmd: python src/db/update_postgres_db.py --csv-path data/db/item_features.csv
+    deps:
+    - path: workflow/dummy
+      md5: f02e326f800ee26f04df7961adbf7c0a
+      size: 6
+  create_postgres_weekly_features:
+    cmd: python src/db/create_postgres_weekly_features.py data/interim/interactions_clean.csv
+      data/interim/items_clean.csv data/db/item_weekly_features.csv
+    deps:
+    - path: data/interim/interactions_clean.csv
+      md5: 7ac7b4f280880411c8fecd2843c275e9
+      size: 169082235
+    - path: data/interim/items_clean.csv
+      md5: 044704c2de2bbbc614b132de6fb3ccbe
+      size: 33156058
+    - path: src/db/create_postgres_weekly_features.py
+      md5: 1122949481dc0e14d5aa5fe626c536ab
+      size: 1458
+    outs:
+    - path: data/db/item_weekly_features.csv
+      md5: 467c8d3d717b9e6c15d231f11a080916
+      size: 24364375
+  choose_users_for_showcase:
+    cmd: python src/visualization/choose_users_for_showcase.py src/visualization/showcase_users.yaml
+      data/processed/chosen_for_showcase_users.csv
+    deps:
+    - path: src/visualization/choose_users_for_showcase.py
+      md5: 37ebcab803ef18ddd892fa54c6038cd6
+      size: 669
+    - path: src/visualization/showcase_users.yaml
+      md5: 7b0f6fdcf49ea0d30d7f48b9007e839b
+      size: 395
+    outs:
+    - path: data/processed/chosen_for_showcase_users.csv
+      md5: 34eac5883360e9a8b4e75ccae14534f2
+      size: 141
+  create_postgres_showcase_data:
+    cmd: python src/db/create_postgres_showcase_data.py data/db/showcase
+    deps:
+    - path: data/processed/chosen_for_showcase_users.csv
+      md5: 34eac5883360e9a8b4e75ccae14534f2
+      size: 141
+    - path: src/db/create_postgres_showcase_data.py
+      md5: 577911e295cac3b0d879724a88b3cff9
+      size: 1116
+    - path: src/visualization/showcase.py
+      md5: 174a317a7293d43e3c48a99783122795
+      size: 23536
+    - path: src/visualization/showcase_models.yaml
+      md5: 557a90af087173b1db63ae5e9aeb6e74
+      size: 195
+    - path: src/visualization/showcase_users.yaml
+      md5: 7b0f6fdcf49ea0d30d7f48b9007e839b
+      size: 395
+    outs:
+    - path: data/db/showcase
+      md5: db4d81bffcf9c216900fae60016aa83d.dir
+      size: 60459
+      nfiles: 4

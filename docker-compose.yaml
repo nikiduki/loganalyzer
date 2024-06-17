@@ -1,0 +1,128 @@
+version: '3.9.7'
+
+services:
+
+  minio:
+    container_name: minio
+    hostname: minio
+    image: quay.io/minio/minio:RELEASE.2022-05-08T23-50-31Z
+    command: server --console-address ":9001" /data/
+    expose:
+      - "9000"
+      - "9001"
+    networks:
+      - s3      
+    environment:
+      MINIO_ACCESS_KEY: ${ACCESS_KEY_ID}        
+      MINIO_SECRET_KEY: ${SECRET_ACCESS_KEY}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    volumes:
+      - ./Docker/minio/:/data
+      
+  db:
+    container_name: postgres
+    image: postgres:15.1-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256 
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - postgres
+    command: >
+      -c work_mem=16MB
+      -c maintenance_work_mem=128MB
+      
+  pgadmin:
+    container_name: pgadmin
+    image: dpage/pgadmin4
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+      PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION: "False"
+    user: root
+    volumes:
+       - ./Docker/pgadmin_server.json:/pgadmin4/servers.json
+       - ./Docker/pgadmin/:/var/lib/pgadmin
+    ports:
+      - "5050:80"
+    networks:
+      - postgres
+      
+  mlflow:
+    container_name: mlflow_server
+    build: Docker/mlflow/.
+    ports:
+      - "5000:5000"
+    networks:
+      - postgres
+      - s3
+      - proxy
+    depends_on:
+      - minio
+      - db
+    environment:
+      - ACCESS_KEY_ID=${ACCESS_KEY_ID}
+      - SECRET_ACCESS_KEY=${SECRET_ACCESS_KEY}
+    command: mlflow server --backend-store-uri postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db/${POSTGRES_DB} --default-artifact-root s3://${S3_BUCKET}/ --host 0.0.0.0
+
+  model_service:
+    container_name: model_service
+    restart: on-failure:3
+    build: 
+      context: .
+      dockerfile: Docker/model_service/Dockerfile
+    ports:
+      - "8003:8003"
+    hostname: model_service
+    networks:
+      - s3
+      - app
+      - postgres
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+    depends_on:
+      - minio
+      - mlflow
+      - db
+
+  frontend:
+    container_name: frontend
+    restart: always
+    build: 
+      context: .
+      dockerfile: Docker/frontend/Dockerfile
+    ports:
+      - "8080:8080"
+    networks:
+      - app
+      - proxy
+      - s3
+    volumes:
+      - ./reports/:/code/reports/
+
+
+networks:
+  postgres:
+    driver: bridge
+  s3:
+    driver: bridge
+  app:
+    driver: bridge
+  proxy:
+    driver: bridge
+    
+    
+volumes:
+  postgres:
+      

@@ -1,0 +1,112 @@
+vars:
+  - workflow/workflow_config.yaml
+
+stages:
+
+  add_user_stats_time_based:
+    cmd: snakemake --cores ${cores} --forceall --snakefile workflow/features.snake prepare_all_users_time_based
+    deps:
+      - workflow/workflow_config.yaml
+      - src/features/add_user_stats_time_based.py
+      - ${files.clean_inter}
+      - ${files.clean_items}
+      - ${files.clean_users}
+    outs:
+      - data/processed/${pipe_dates.begin.inference}/user_features.csv:
+          cache: false
+
+  add_item_stats_time_based:
+    cmd: snakemake --cores ${cores} --forceall --snakefile workflow/features.snake prepare_all_items_time_based
+    deps:
+      - workflow/workflow_config.yaml
+      - src/features/add_item_stats_time_based.py
+      - ${files.clean_inter}
+      - ${files.clean_users}
+      - ${files.clean_items}
+    outs:
+      - data/processed/${pipe_dates.begin.inference}/item_features.csv:
+          cache: false
+
+  get_data:
+    cmd: source src/data/get_data.sh
+    deps:
+      - src/data/get_data.sh
+    outs:
+      - data/raw/interactions.csv
+      - data/raw/items.csv
+      - data/raw/sample_submission.csv
+      - data/raw/users.csv
+
+  add_user_stats_static:
+    cmd: python src/features/add_user_stats_static.py ${files.clean_users} ${files.static_users}
+    deps:
+    - src/features/add_user_stats_static.py
+    - ${files.clean_users}
+    outs:
+    - ${files.static_users}:
+        cache: false
+
+  add_item_stats_static:
+    cmd: python src/features/add_item_stats_static.py ${files.clean_items} ${files.static_items}
+    deps:
+    - src/features/add_item_stats_static.py
+    - ${files.clean_items}
+    outs:
+    - ${files.static_items}:
+        cache: false  
+
+  preprocess:
+    cmd: python src/data/preprocess.py data/raw/interactions.csv data/raw/items.csv data/raw/users.csv ${files.clean_inter} ${files.clean_items} ${files.clean_users}
+    deps:
+      - src/data/preprocess.py
+      - data/raw/interactions.csv
+      - data/raw/items.csv
+      - data/raw/users.csv
+    outs:
+      - ${files.clean_inter}:
+          cache: false
+      - ${files.clean_items}:
+          cache: false
+      - ${files.clean_users}:
+          cache: false
+
+  create_postgres_features:
+    cmd: python src/db/create_postgres_features.py data/processed/${pipe_dates.begin.inference}/item_features.csv ${files.static_items} ${files.clean_items} data/db/item_features.csv
+    deps:
+      - src/db/create_postgres_features.py
+      - data/processed/${pipe_dates.begin.inference}/item_features.csv
+      - ${files.static_items}
+      - ${files.clean_items}
+    outs:
+      - data/db/item_features.csv:
+          cache: false
+
+  create_postgres_weekly_features:
+    cmd: python src/db/create_postgres_weekly_features.py ${files.clean_inter} ${files.clean_items} data/db/item_weekly_features.csv
+    deps:
+      - src/db/create_postgres_weekly_features.py
+      - ${files.clean_inter}
+      - ${files.clean_items}
+    outs:
+      - data/db/item_weekly_features.csv:
+          cache: false
+
+  create_postgres_showcase_data:
+    cmd:  python src/db/create_postgres_showcase_data.py data/db/showcase
+    deps:
+      - data/processed/chosen_for_showcase_users.csv
+      - src/visualization/showcase_users.yaml
+      - src/visualization/showcase_models.yaml
+      - src/db/create_postgres_showcase_data.py
+      - src/visualization/showcase.py
+    outs:
+      - data/db/showcase:
+          cache: False
+
+  choose_users_for_showcase:
+    cmd:  python src/visualization/choose_users_for_showcase.py src/visualization/showcase_users.yaml data/processed/chosen_for_showcase_users.csv
+    deps:
+      - src/visualization/choose_users_for_showcase.py
+      - src/visualization/showcase_users.yaml
+    outs:
+      - data/processed/chosen_for_showcase_users.csv
