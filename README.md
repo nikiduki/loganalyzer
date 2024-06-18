@@ -50,9 +50,9 @@ pip install -r ./environment/requirements.txt
    
  - Валидация и оптимизация МЛ модели: после обучения модели необходимо проверить ее на валидационном наборе данных и провести оптимизацию гиперпараметров для улучшения качества обнаружения. Важно учитывать время, необходимое для проведения анализа, чтобы обеспечить быстродействие системы.
    
- - MLOps: MLflow, DVC, FastAPI, Minio, PostgreSQL
+ - MLOps: MLflow, DVC, FastAPI, Minio, PostgreSQL.
    
- - ML: PyTorch, BERT, Time Series Validation
+ - ML: PyTorch, BERT, Time Series Validation.
    
  - Frontend: добавить функции и простой фронтенд для взаимодействия пользователя. Для создания фронтенда можно использовать фреймворк Streamlit.
    
